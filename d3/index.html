@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Visualization</title>
+</head>
+<body>
+<div style="display: flex; gap: 20px">
+  <div id="filters"></div>
+  <div id="sorters"></div>
+  <div style="display: flex; justify-content: flex-end; flex-direction: column">
+    <button id="build">Build</button>
+  </div>
+</div>
+
+<div id="graph"></div>
+
+<div id="content">
+  <table>
+    <thead>
+    <td>Game name</td>
+    <td>Year</td>
+    <td>Publisher</td>
+    <td>Platform</td>
+    <td>Genre</td>
+    <td>Global sales (millions)</td>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
+</div>
+
+<script type="module">
+  import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm'
+
+  const FILTERED_FIELDS = ['platform', 'year', 'genre', 'publisher']
+  const SORTED_FIELDS = ['platform', 'year', 'genre', 'publisher', 'globalSales', 'name']
+  const FILTER = 'Filter'
+  const SORTER = 'Sorter'
+  const DATA_PATH = './data/vgsales.csv'
+  const AXIS_X_SELECTS = ['year']
+  const AXIS_Y_SELECTS = ['globalSales']
+
+  // utils
+  const groupDataByField = (data, fieldName) => d3.group(data, item => item[fieldName])
+
+  const sortBy = (field, reverse) => {
+    const key = x => x[field]
+    reverse = [-1, 1][+!!reverse]
+    return (a, b) => {
+      a = key(a)
+      b = key(b)
+      return a == b ? 0 : reverse * ((a > b) - (b > a))
+    }
+  }
+
+  const chainSortBy = sortByArray => {
+    return (a, b) => {
+      for (let i = 0; i < sortByArray.length; i++) {
+        const res = sortByArray[i](a, b)
+        if (res != 0) {
+          return res
+        }
+      }
+      return 0
+    }
+  }
+
+  const fillTable = data => {
+    d3.select('#content tbody')
+    .selectAll('tr')
+    .data(data)
+    .join('tr')
+    .html((row) => `<tr>
+      <td>${row.name}</td>
+      <td>${row.year}</td>
+      <td>${row.publisher}</td>
+      <td>${row.platform}</td>
+      <td>${row.genre}</td>
+      <td>${row.globalSales}</td>
+  </tr>`)
+  }
+
+  const makeSortersMovable = () => {
+    const list = document.getElementById("sorters")
+
+    list.addEventListener("click", (e) => {
+      const target = e.target
+      if (target.tagName === "BUTTON") {
+        const selectedItem = target.parentNode
+        if (target.classList.contains("up-button")) {
+          if (selectedItem.previousElementSibling) {
+            selectedItem.parentNode.insertBefore(selectedItem, selectedItem.previousElementSibling)
+          }
+        } else if (target.classList.contains("down-button")) {
+          if (selectedItem.nextElementSibling) {
+            selectedItem.parentNode.insertBefore(selectedItem.nextElementSibling, selectedItem)
+          }
+        }
+      }
+    })
+  }
+
+  const buildButtonCallback = () => {
+    const filters = getAllFilters()
+    let resultData = Array.from(data)
+
+    for (const filter of filters) {
+      let selectedOptions = []
+      for (const option of filter.options) {
+        if (option.selected) {
+          selectedOptions.push(option.value)
+        }
+      }
+      if (selectedOptions.length > 0) {
+        resultData = resultData.filter(
+            item => selectedOptions.includes(item[filter.id.replace(FILTER, '')]))
+      }
+    }
+    console.log(resultData)
+    resultData = resultData.sort(getSortsData())
+
+    fillTable(resultData)
+    drawGraph(resultData)
+  }
+
+  const makeBuildButton = () => {
+    document.getElementById('build').addEventListener('click', buildButtonCallback)
+  }
+
+  const getData = async () => await d3.csv(DATA_PATH, res => {
+    if (res.Year !== 'N/A' && res.Publisher !== 'N/A') {
+      return {
+        id: +res.Rank,
+        name: res.Name,
+        platform: res.Platform,
+        year: res.Year,
+        genre: res.Genre,
+        publisher: res.Publisher,
+        northAmericaSales: +res.NA_Sales,
+        europeSales: +res.EU_Sales,
+        japanSales: +res.JP_Sales,
+        otherSales: +res.Other_Sales,
+        globalSales: +res.Global_Sales
+      }
+    }
+  })
+
+  // filters
+  const initFilterHtml = filterName => {
+    const filterId = filterName + FILTER
+    return `<select name="${filterName}" id="${filterId}" multiple size="20"></select>`
+  }
+
+  const initFiltersHtml = () => {
+    const filtersDiv = document.getElementById('filters')
+    filtersDiv.innerHTML += `<h2>Filters</h2>`
+    FILTERED_FIELDS.forEach(filteredFieldName => {
+      filtersDiv.innerHTML += initFilterHtml(filteredFieldName)
+    })
+  }
+
+  const getAllFilters = () => {
+    let filters = []
+    for (const filterName of FILTERED_FIELDS) {
+      const filter = document.getElementById(filterName + FILTER)
+      filters.push(filter)
+    }
+    return filters
+  }
+
+  const fillFilter = (data, filterId) => {
+    d3.select('#' + filterId + FILTER)
+    .selectAll('option')
+    .data(data)
+    .join('option')
+    .html(data => `<option value="${data}">${data}</option>`)
+  }
+
+  const fillAllFilters = data => {
+    FILTERED_FIELDS.forEach(filterName => {
+      const keys = groupDataByField(data, filterName).keys().toArray().sort()
+      fillFilter(keys, filterName)
+    })
+  }
+
+  // sorts
+  const initSorterHtml = (sorterName) => {
+    const sorterId = sorterName + SORTER
+    return `<div id="${sorterId}">
+              <button class="up-button">↑</button>
+              <button class="down-button">↓</button>
+              <span>Sort by ${sorterName}</span>
+              <input type="radio" id="${sorterId}Asc" name="${sorterName}" value="${sorterName}"/>
+              <label for="${sorterId}Asc">Asc</label>
+              <input type="radio" id="${sorterId}Desc" name="${sorterName}" value="${sorterName}" />
+              <label for="${sorterId}Desc">Desc</label>
+              <input type="radio" id="${sorterId}NS" name="${sorterName}" value="${sorterName}" checked/>
+              <label for="${sorterId}NS">NS</label>
+            </div>`
+  }
+
+  const initSortersHtml = () => {
+    const sortsDiv = document.getElementById('sorters')
+    sortsDiv.innerHTML += `<h2>Sorters</h2>`
+    SORTED_FIELDS.forEach(sortedFieldName => {
+      sortsDiv.innerHTML += initSorterHtml(sortedFieldName)
+    })
+  }
+
+  const getSortsData = () => {
+    const sortsSequence = document.getElementById('sorters').children
+    let sortData = []
+    for (const sortsSequenceElement of sortsSequence) {
+      const id = sortsSequenceElement.id
+      if (!id) {
+        continue
+      }
+      if (document.getElementById(id + 'Asc').checked) {
+        sortData.push(sortBy(id.replace(SORTER, ''), true))
+      } else if (document.getElementById(id + 'Desc').checked) {
+        sortData.push(sortBy(id.replace(SORTER, ''), false))
+      }
+    }
+    console.log(sortData)
+    return chainSortBy(sortData)
+  }
+
+  // const createAxes = (data, fieldX, fieldY) => {
+  //   const width = 600;
+  //   const height = 600;
+  //   let marginX = 40;
+  //   let marginY = 40;
+  //   let [min, max] = d3.extent(data.map(d => d[fieldY]))
+  //
+  //   let scaleX = d3.scaleLinear()
+  //   .domain(d3.extent(data.map(d => d[fieldX])))
+  //   .range([0, width - 2 * marginX])
+  //
+  //   let scaleY = d3.scaleLinear()
+  //   .domain([min * 0.8, max])
+  //   .range([height - 2 * marginY, 0])
+  //
+  //   let axisX = d3.axisBottom(scaleX); // горизонтальная
+  //   let axisY = d3.axisLeft(scaleY); // вертикальная
+  //
+  //   svg.append("g")
+  //   .attr("transform", `translate(${marginX}, ${height - marginY})`)
+  //   .call(axisX)
+  //   svg.append("g")
+  //   .attr("transform", `translate(${marginX}, ${marginY})`)
+  //   .call(axisY)
+  //   return [scaleX, scaleY]
+  // }
+
+  // graph
+  const width = 1200;
+  const height = 600;
+  const marginTop = 20;
+  const marginRight = 20;
+  const marginBottom = 30;
+  const marginLeft = 30;
+
+  const svg = d3.select('#graph')
+  .append('svg')
+  .attr('width', width)
+  .attr('height', height)
+
+  const drawGraph = (data) => {
+
+    let resData = []
+
+    const groupX = d3.group(data, d => d.year)
+    const axesXData = groupX.keys()
+    for (const axesXItem of axesXData) {
+      const groupY = d3.group(groupX.get(axesXItem), d => d.platform)
+      const axesYData = groupY.keys()
+      for (const axesYItem of axesYData) {
+        const viewData = d3.sum(groupY.get(axesYItem), d => d.globalSales)
+        console.log(axesXItem, axesYItem, viewData)
+        resData.push({axesXItem, axesYItem, viewData})
+      }
+    }
+
+    const x = d3.scaleBand()
+    .domain(d3.group(resData, d => d.axesXItem).keys())
+    .range([marginLeft, width - marginRight])
+    .padding(1)
+
+    const y = d3.scaleLinear()
+    .range([height - marginBottom, marginTop])
+    .domain(d3.extent(resData, d => d.viewData))
+
+    svg.append("g")
+    .attr("transform", `translate(0,${height - marginBottom})`)
+    .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+
+    svg.append("g")
+    .attr("transform", `translate(${marginLeft},0)`)
+    .call(d3.axisLeft(y).ticks(height / 40))
+    .call(g => g.select(".domain").remove())
+    .call(g => g.selectAll(".tick line").clone()
+    .attr("x2", width - marginLeft - marginRight)
+    .attr("stroke-opacity", 0.1))
+    .call(g => g.append("text")
+    .attr("x", -marginLeft)
+    .attr("y", 10)
+    .attr("fill", "currentColor")
+    .attr("text-anchor", "start")
+    .text("↑ Daily close ($)"))
+
+    const points = resData.map((d) => [x(d.axesXItem), y(d.viewData), d.axesYItem])
+    const groups = d3.rollup(points, v => Object.assign(v, {z: v[0][2]}), d => d[2])
+
+    console.log(points)
+    console.log(groups)
+
+    const line = d3.line();
+    const path = svg.append("g")
+    .attr("fill", "none")
+    .attr("stroke", "steelblue")
+    .attr("stroke-width", 1.5)
+    .attr("stroke-linejoin", "round")
+    .attr("stroke-linecap", "round")
+    .selectAll("path")
+    .data(groups.values())
+    .join("path")
+    .style("mix-blend-mode", "multiply")
+    .attr("d", line)
+
+    const dot = svg.append("g")
+    .attr("display", "none");
+
+    dot.append("circle")
+    .attr("r", 2.5);
+
+    dot.append("text")
+    .attr("text-anchor", "middle")
+    .attr("y", -8);
+
+    svg
+    .on("pointerenter", pointerentered)
+    .on("pointermove", pointermoved)
+    .on("pointerleave", pointerleft)
+    .on("touchstart", event => event.preventDefault())
+
+    function pointermoved(event) {
+      const [xm, ym] = d3.pointer(event);
+      const i = d3.leastIndex(points, ([x, y]) => Math.hypot(x - xm, y - ym));
+      const [x, y, k] = points[i];
+      path.style("stroke", ({z}) => z === k ? null : "#ddd").filter(({z}) => z === k).raise();
+      dot.attr("transform", `translate(${x},${y})`);
+      dot.select("text").text(k);
+      svg.property("value", resData[i]).dispatch("input", {bubbles: true});
+    }
+
+    function pointerentered() {
+      path.style("mix-blend-mode", null).style("stroke", "#ddd");
+      dot.attr("display", null);
+    }
+
+    function pointerleft() {
+      path.style("mix-blend-mode", "multiply").style("stroke", null);
+      dot.attr("display", "none");
+      svg.node().value = null;
+      svg.dispatch("input", {bubbles: true});
+    }
+  }
+
+  // main
+  const data = await getData()
+
+  initFiltersHtml()
+  fillAllFilters(data)
+
+  initSortersHtml()
+  makeSortersMovable()
+
+  fillTable(data)
+  makeBuildButton()
+  buildButtonCallback()
+</script>
+</body>
+</html>
