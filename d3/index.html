@@ -8,12 +8,14 @@
 <div style="display: flex; gap: 20px">
   <div id="filters"></div>
   <div id="sorters"></div>
+  <div id="chartSelectors">
+  </div>
   <div style="display: flex; justify-content: flex-end; flex-direction: column">
     <button id="build">Build</button>
   </div>
 </div>
 
-<div id="graph"></div>
+<svg id="chart"></svg>
 
 <div id="content">
   <table>
@@ -35,11 +37,11 @@
 
   const FILTERED_FIELDS = ['platform', 'year', 'genre', 'publisher']
   const SORTED_FIELDS = ['platform', 'year', 'genre', 'publisher', 'globalSales', 'name']
+  const CHART_DATA_SHOW = ['genre', 'platform', 'publisher']
+  const CHART_SELECTOR = 'ChartSelector'
   const FILTER = 'Filter'
   const SORTER = 'Sorter'
   const DATA_PATH = './data/vgsales.csv'
-  const AXIS_X_SELECTS = ['year']
-  const AXIS_Y_SELECTS = ['globalSales']
 
   // utils
   const groupDataByField = (data, fieldName) => d3.group(data, item => item[fieldName])
@@ -184,8 +186,33 @@
     })
   }
 
+  // chart selectors
+  const initChartSelectorsHtml = () => {
+    const chartSelectorsDiv = document.getElementById('chartSelectors')
+    chartSelectorsDiv.innerHTML += `<h2>Chart selectors</h2>`
+    chartSelectorsDiv.innerHTML += `<h3>Show on chart</h3>`
+    chartSelectorsDiv.innerHTML +=
+        `<select name="${CHART_SELECTOR}" id="${CHART_SELECTOR}"></select>`
+    chartSelectorsDiv.innerHTML += `<h3>Aggregation</h3>`
+    chartSelectorsDiv.innerHTML +=
+        `<select name="${CHART_SELECTOR + 'Aggregation'}" id="${CHART_SELECTOR + 'Aggregation'}">
+           <option value="sum">sum</option>
+           <option value="min">min</option>
+           <option value="max">max</option>
+         </select>`
+    fillSelector(CHART_DATA_SHOW, CHART_SELECTOR)
+  }
+
+  const fillSelector = (data, chartSelectorId) => {
+    d3.select('#' + chartSelectorId)
+    .selectAll('option')
+    .data(data)
+    .join('option')
+    .html(data => `<option value="${data}">${data}</option>`)
+  }
+
   // sorts
-  const initSorterHtml = (sorterName) => {
+  const initSorterHtml = sorterName => {
     const sorterId = sorterName + SORTER
     return `<div id="${sorterId}">
               <button class="up-button">↑</button>
@@ -226,96 +253,88 @@
     return chainSortBy(sortData)
   }
 
-  // const createAxes = (data, fieldX, fieldY) => {
-  //   const width = 600;
-  //   const height = 600;
-  //   let marginX = 40;
-  //   let marginY = 40;
-  //   let [min, max] = d3.extent(data.map(d => d[fieldY]))
-  //
-  //   let scaleX = d3.scaleLinear()
-  //   .domain(d3.extent(data.map(d => d[fieldX])))
-  //   .range([0, width - 2 * marginX])
-  //
-  //   let scaleY = d3.scaleLinear()
-  //   .domain([min * 0.8, max])
-  //   .range([height - 2 * marginY, 0])
-  //
-  //   let axisX = d3.axisBottom(scaleX); // горизонтальная
-  //   let axisY = d3.axisLeft(scaleY); // вертикальная
-  //
-  //   svg.append("g")
-  //   .attr("transform", `translate(${marginX}, ${height - marginY})`)
-  //   .call(axisX)
-  //   svg.append("g")
-  //   .attr("transform", `translate(${marginX}, ${marginY})`)
-  //   .call(axisY)
-  //   return [scaleX, scaleY]
-  // }
-
-  // graph
-  const width = 1200;
-  const height = 600;
+  // chart
+  const width = 1500;
+  const height = 1000;
   const marginTop = 20;
   const marginRight = 20;
   const marginBottom = 30;
   const marginLeft = 30;
 
-  const svg = d3.select('#graph')
-  .append('svg')
+  const svg = d3.select('#chart')
   .attr('width', width)
   .attr('height', height)
 
   const drawGraph = (data) => {
+    svg.selectAll("*").remove();
 
     let resData = []
+
+    let show = ''
+    for (const option of document.getElementById(CHART_SELECTOR).options) {
+      if (option.selected) {
+        show = option.value
+      }
+    }
+
+    let aggregation = ''
+    for (const option of document.getElementById(CHART_SELECTOR + 'Aggregation').options) {
+      if (option.selected) {
+        aggregation = option.value
+      }
+    }
 
     const groupX = d3.group(data, d => d.year)
     const axesXData = groupX.keys()
     for (const axesXItem of axesXData) {
-      const groupY = d3.group(groupX.get(axesXItem), d => d.platform)
+      const groupY = d3.group(groupX.get(axesXItem), d => d[show])
       const axesYData = groupY.keys()
       for (const axesYItem of axesYData) {
-        const viewData = d3.sum(groupY.get(axesYItem), d => d.globalSales)
+        const viewData = d3[aggregation](groupY.get(axesYItem), d => d.globalSales)
         console.log(axesXItem, axesYItem, viewData)
         resData.push({axesXItem, axesYItem, viewData})
       }
     }
 
-    const x = d3.scaleBand()
+    const xScale = d3.scaleBand()
     .domain(d3.group(resData, d => d.axesXItem).keys())
     .range([marginLeft, width - marginRight])
     .padding(1)
 
-    const y = d3.scaleLinear()
-    .range([height - marginBottom, marginTop])
+    const yScale = d3.scaleLinear()
     .domain(d3.extent(resData, d => d.viewData))
+    .range([height - marginBottom, marginTop])
 
-    svg.append("g")
-    .attr("transform", `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+    // отрисованная ось ox
+    svg.append('g')
+    .attr('transform', `translate(0,${height - marginBottom})`)
+    .call(d3.axisBottom(xScale))
 
-    svg.append("g")
-    .attr("transform", `translate(${marginLeft},0)`)
-    .call(d3.axisLeft(y).ticks(height / 40))
+    svg.append('g')
+    .attr('transform', `translate(0,${height - marginBottom})`)
+    .call(d3.axisBottom(xScale))
+    .call(g => g.select(".domain").remove())
+    .call(g => g.selectAll(".tick line").clone()
+    .attr("y2",  marginTop + marginBottom - height)
+    .attr("stroke-opacity", 0.1))
+
+    // отрисованная ось oy
+    svg.append('g')
+    .attr('transform', `translate(${marginLeft},0)`)
+    .call(d3.axisLeft(yScale))
+
+    svg.append('g')
+    .attr('transform', `translate(${marginLeft},0)`)
+    .call(d3.axisLeft(yScale))
     .call(g => g.select(".domain").remove())
     .call(g => g.selectAll(".tick line").clone()
     .attr("x2", width - marginLeft - marginRight)
     .attr("stroke-opacity", 0.1))
-    .call(g => g.append("text")
-    .attr("x", -marginLeft)
-    .attr("y", 10)
-    .attr("fill", "currentColor")
-    .attr("text-anchor", "start")
-    .text("↑ Daily close ($)"))
 
-    const points = resData.map((d) => [x(d.axesXItem), y(d.viewData), d.axesYItem])
+    const points = resData.map((d) => [xScale(d.axesXItem), yScale(d.viewData), d.axesYItem])
     const groups = d3.rollup(points, v => Object.assign(v, {z: v[0][2]}), d => d[2])
 
-    console.log(points)
-    console.log(groups)
-
-    const line = d3.line();
+    const line = d3.line()
     const path = svg.append("g")
     .attr("fill", "none")
     .attr("stroke", "steelblue")
@@ -329,14 +348,14 @@
     .attr("d", line)
 
     const dot = svg.append("g")
-    .attr("display", "none");
+    .attr("display", "none")
 
     dot.append("circle")
-    .attr("r", 2.5);
+    .attr("r", 2.5)
 
     dot.append("text")
     .attr("text-anchor", "middle")
-    .attr("y", -8);
+    .attr("y", -8)
 
     svg
     .on("pointerenter", pointerentered)
@@ -345,13 +364,13 @@
     .on("touchstart", event => event.preventDefault())
 
     function pointermoved(event) {
-      const [xm, ym] = d3.pointer(event);
-      const i = d3.leastIndex(points, ([x, y]) => Math.hypot(x - xm, y - ym));
-      const [x, y, k] = points[i];
-      path.style("stroke", ({z}) => z === k ? null : "#ddd").filter(({z}) => z === k).raise();
-      dot.attr("transform", `translate(${x},${y})`);
-      dot.select("text").text(k);
-      svg.property("value", resData[i]).dispatch("input", {bubbles: true});
+      const [xm, ym] = d3.pointer(event)
+      const i = d3.leastIndex(points, ([x, y]) => Math.hypot(x - xm, y - ym))
+      const [x, y, k] = points[i]
+      path.style("stroke", ({z}) => z === k ? null : "#ddd").filter(({z}) => z === k).raise()
+      dot.attr("transform", `translate(${x},${y})`)
+      dot.select("text").text(k)
+      svg.property("value", resData[i]).dispatch("input", {bubbles: true})
     }
 
     function pointerentered() {
@@ -372,8 +391,8 @@
 
   initFiltersHtml()
   fillAllFilters(data)
-
   initSortersHtml()
+  initChartSelectorsHtml()
   makeSortersMovable()
 
   fillTable(data)
