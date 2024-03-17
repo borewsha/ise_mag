@@ -119,11 +119,11 @@
             item => selectedOptions.includes(item[filter.id.replace(FILTER, '')]))
       }
     }
-    console.log(resultData)
+
     resultData = resultData.sort(getSortsData())
 
     fillTable(resultData)
-    drawGraph(resultData)
+    drawChart(resultData)
   }
 
   const makeBuildButton = () => {
@@ -197,6 +197,7 @@
     chartSelectorsDiv.innerHTML +=
         `<select name="${CHART_SELECTOR + 'Aggregation'}" id="${CHART_SELECTOR + 'Aggregation'}">
            <option value="sum">sum</option>
+           <option value="mean">mean</option>
            <option value="min">min</option>
            <option value="max">max</option>
          </select>`
@@ -249,24 +250,22 @@
         sortData.push(sortBy(id.replace(SORTER, ''), false))
       }
     }
-    console.log(sortData)
     return chainSortBy(sortData)
   }
 
   // chart
-  const width = 1500;
-  const height = 1000;
-  const marginTop = 20;
-  const marginRight = 20;
-  const marginBottom = 30;
-  const marginLeft = 30;
+  const drawChart = (data) => {
+    const width = 1500
+    const height = 1000
+    const marginTop = 20
+    const marginRight = 20
+    const marginBottom = 30
+    const marginLeft = 30
+    const animationDuration = 3000
 
-  const svg = d3.select('#chart')
-  .attr('width', width)
-  .attr('height', height)
-
-  const drawGraph = (data) => {
-    svg.selectAll("*").remove();
+    const svg = d3.select('#chart')
+    .attr('width', width)
+    .attr('height', height)
 
     let resData = []
 
@@ -291,7 +290,6 @@
       const axesYData = groupY.keys()
       for (const axesYItem of axesYData) {
         const viewData = d3[aggregation](groupY.get(axesYItem), d => d.globalSales)
-        console.log(axesXItem, axesYItem, viewData)
         resData.push({axesXItem, axesYItem, viewData})
       }
     }
@@ -305,47 +303,121 @@
     .domain(d3.extent(resData, d => d.viewData))
     .range([height - marginBottom, marginTop])
 
-    // отрисованная ось ox
-    svg.append('g')
-    .attr('transform', `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(xScale))
+    // отрисованная ось x
+    if (d3.select('#chart g.x-axis').empty()) {
+      svg.append('g')
+      .attr("class", "x-axis")
+      .attr('transform', `translate(0,${height - marginBottom})`)
+      .call(d3.axisBottom(xScale))
+    } else {
+      d3.select('#chart g.x-axis')
+      .attr('transform', `translate(0,${height - marginBottom})`)
+      .transition()
+      .duration(animationDuration)
+      .call(d3.axisBottom(xScale))
+    }
 
-    svg.append('g')
-    .attr('transform', `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(xScale))
-    .call(g => g.select(".domain").remove())
-    .call(g => g.selectAll(".tick line").clone()
-    .attr("y2",  marginTop + marginBottom - height)
-    .attr("stroke-opacity", 0.1))
+    // отрисованная ось y
+    if (d3.select('#chart g.y-axis').empty()) {
+      svg.append('g')
+      .attr("class", "y-axis")
+      .attr('transform', `translate(${marginLeft},0)`)
+      .call(d3.axisLeft(yScale))
+    } else {
+      d3.select('#chart g.y-axis')
+      .attr('transform', `translate(${marginLeft},0)`)
+      .transition()
+      .duration(animationDuration)
+      .call(d3.axisLeft(yScale))
+    }
 
-    // отрисованная ось oy
-    svg.append('g')
-    .attr('transform', `translate(${marginLeft},0)`)
-    .call(d3.axisLeft(yScale))
+    function makeXGridlines() {
+      return d3.axisBottom(xScale)
+      .tickSize(-height + marginTop + marginBottom)
+      .tickFormat("")
+    }
 
-    svg.append('g')
-    .attr('transform', `translate(${marginLeft},0)`)
-    .call(d3.axisLeft(yScale))
-    .call(g => g.select(".domain").remove())
-    .call(g => g.selectAll(".tick line").clone()
-    .attr("x2", width - marginLeft - marginRight)
-    .attr("stroke-opacity", 0.1))
+    function makeYGridlines() {
+      return d3.axisLeft(yScale)
+      .tickSize(-width + marginLeft + marginRight)
+      .tickFormat("")
+    }
+
+    if (d3.select('.x-grid').empty()) {
+      // Добавление сетки оси X
+      svg.append("g")
+      .attr("class", "x-grid")
+      .attr("transform", `translate(0,${height - marginBottom})`)
+      .call(makeXGridlines())
+      .selectAll('.tick line')
+      .attr('stroke-opacity', 0.1)
+
+      // Добавление сетки оси Y
+      svg.append("g")
+      .attr("class", "y-grid")
+      .attr("transform", `translate(${marginLeft},0)`)
+      .call(makeYGridlines())
+      .selectAll('.tick line')
+      .attr('stroke-opacity', 0.1)
+    } else {
+      updateGrid()
+    }
+
+    function updateGrid() {
+      svg.select(".x-grid")
+      .transition()
+      .duration(animationDuration)
+      .call(makeXGridlines())
+      .selectAll('.tick line')
+      .attr('stroke-opacity', 0.1)
+
+      svg.select(".y-grid")
+      .transition()
+      .duration(animationDuration)
+      .call(makeYGridlines())
+      .selectAll('.tick line')
+      .attr('stroke-opacity', 0.1)
+    }
 
     const points = resData.map((d) => [xScale(d.axesXItem), yScale(d.viewData), d.axesYItem])
     const groups = d3.rollup(points, v => Object.assign(v, {z: v[0][2]}), d => d[2])
 
+    // отрисованные линии
     const line = d3.line()
-    const path = svg.append("g")
-    .attr("fill", "none")
-    .attr("stroke", "steelblue")
-    .attr("stroke-width", 1.5)
-    .attr("stroke-linejoin", "round")
-    .attr("stroke-linecap", "round")
-    .selectAll("path")
-    .data(groups.values())
-    .join("path")
-    .style("mix-blend-mode", "multiply")
-    .attr("d", line)
+    let path
+    if (d3.select('#chart g.lines').empty()) {
+      path = svg.append("g")
+      .attr("class", "lines")
+      .attr("fill", "none")
+      .attr("stroke", "steelblue")
+      .attr("stroke-width", 1.5)
+      .attr("stroke-linejoin", "round")
+      .attr("stroke-linecap", "round")
+      .selectAll("path")
+      .data(groups.values())
+      .join("path")
+      .style("mix-blend-mode", "multiply")
+      .attr("d", line)
+    } else {
+      path = d3.select('#chart g.lines')
+      .selectAll("path")
+      .data(groups.values())
+      .join(
+          enter => enter.append("path")
+          .attr("class", "line")
+          .attr("fill", "none")
+          .attr("stroke", "steelblue")
+          .attr("stroke-width", 1.5)
+          .attr("stroke-linejoin", "round")
+          .attr("stroke-linecap", "round")
+          .style("mix-blend-mode", "multiply")
+          .attr("d", line)
+          .call(enter => enter.transition().duration(animationDuration).attr("d", line)),
+          update => update.call(
+              update => update.transition().duration(animationDuration).attr("d", line)),
+          exit => exit.transition().duration(animationDuration).remove()
+      )
+    }
 
     const dot = svg.append("g")
     .attr("display", "none")
@@ -358,12 +430,12 @@
     .attr("y", -8)
 
     svg
-    .on("pointerenter", pointerentered)
-    .on("pointermove", pointermoved)
-    .on("pointerleave", pointerleft)
+    .on("pointerenter", pointerEntered)
+    .on("pointermove", pointerMoved)
+    .on("pointerleave", pointerLeft)
     .on("touchstart", event => event.preventDefault())
 
-    function pointermoved(event) {
+    function pointerMoved(event) {
       const [xm, ym] = d3.pointer(event)
       const i = d3.leastIndex(points, ([x, y]) => Math.hypot(x - xm, y - ym))
       const [x, y, k] = points[i]
@@ -373,16 +445,16 @@
       svg.property("value", resData[i]).dispatch("input", {bubbles: true})
     }
 
-    function pointerentered() {
-      path.style("mix-blend-mode", null).style("stroke", "#ddd");
-      dot.attr("display", null);
+    function pointerEntered() {
+      path.style("mix-blend-mode", null).style("stroke", "#ddd")
+      dot.attr("display", null)
     }
 
-    function pointerleft() {
-      path.style("mix-blend-mode", "multiply").style("stroke", null);
-      dot.attr("display", "none");
-      svg.node().value = null;
-      svg.dispatch("input", {bubbles: true});
+    function pointerLeft() {
+      path.style("mix-blend-mode", "multiply").style("stroke", null)
+      dot.attr("display", "none")
+      svg.node().value = null
+      svg.dispatch("input", {bubbles: true})
     }
   }
 
