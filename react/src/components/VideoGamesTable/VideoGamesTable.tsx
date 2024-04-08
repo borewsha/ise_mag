@@ -100,6 +100,28 @@ const VideoGamesTable = () => {
 		}
 	]
 
+	const chainSortBy = sortByArray => {
+		return (a, b) => {
+			for (let i = 0; i < sortByArray.length; i++) {
+				const res = sortByArray[i](a, b)
+				if (res != 0) {
+					return res
+				}
+			}
+			return 0
+		}
+	}
+
+	const sortBy = (field, reverse) => {
+		const key = x => x[field]
+		reverse = [-1, 1][+!!reverse]
+		return (a, b) => {
+			a = key(a)
+			b = key(b)
+			return a == b ? 0 : reverse * ((a > b) - (b > a))
+		}
+	}
+
 	return (
 		<>
 			<div style={{ display: 'flex' }}>
@@ -121,9 +143,17 @@ const VideoGamesTable = () => {
 								)
 							}
 						}
-						let sorted = filtered
-						console.log(sorters)
-						setDisplayedData(filtered)
+						let sortData = []
+						sorters.forEach(s => {
+							if (s.sorting === 'asc') {
+								sortData.push(sortBy(s.key, true))
+							}
+							if (s.sorting === 'desc') {
+								sortData.push(sortBy(s.key, false))
+							}
+						})
+						let sorted = filtered.sort(chainSortBy(sortData))
+						setDisplayedData(sorted)
 					}}
 				>
 					Показать
