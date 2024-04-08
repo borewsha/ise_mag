@@ -1,0 +1,18 @@
+.tableBody td {
+  text-align: left;
+  padding: 10px 15px;
+  font-size: 14px;
+  vertical-align: top;
+}
+
+.tableBody tr td:first-child {
+  border-left: none;
+}
+
+.tableBody tr td:last-child {
+  border-right: none;
+}
+
+.tableBody tr:nth-child(even) {
+  background: #f3f3f3;
+}

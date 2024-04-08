@@ -1,0 +1,18 @@
+.tableHead th {
+  font-weight: bold;
+  text-align: left;
+  border: none;
+  padding: 10px 15px;
+  background: #d8d8d8;
+  font-size: 14px;
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+}
+
+.tableHead tr th:first-child {
+  border-left: none;
+}
+
+.tableHead tr th:last-child {
+  border-right: none;
+}
