@@ -112,7 +112,7 @@ const VideoGamesTable = () => {
 		}
 	}
 
-	const sortBy = (field, reverse) => {
+	const sortBy = (field: keyof Game, reverse: number) => {
 		const key = x => x[field]
 		reverse = [-1, 1][+!!reverse]
 		return (a, b) => {
@@ -133,6 +133,7 @@ const VideoGamesTable = () => {
 				/>
 				<Sorters sorters={sorters} setSorters={setSorters} />
 				<button
+					style={{ height: '50px', width: '100px' }}
 					onClick={() => {
 						let filtered = Array.from(data)
 						for (const selectedFiltersKey in selectedFilters) {
@@ -146,10 +147,10 @@ const VideoGamesTable = () => {
 						let sortData = []
 						sorters.forEach(s => {
 							if (s.sorting === 'asc') {
-								sortData.push(sortBy(s.key, true))
+								sortData.push(sortBy(s.key, 1))
 							}
 							if (s.sorting === 'desc') {
-								sortData.push(sortBy(s.key, false))
+								sortData.push(sortBy(s.key, 0))
 							}
 						})
 						let sorted = filtered.sort(chainSortBy(sortData))

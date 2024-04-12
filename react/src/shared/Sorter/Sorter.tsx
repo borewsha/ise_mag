@@ -24,16 +24,19 @@ const Sorter = <Type, Key extends keyof Type>({
 	}
 
 	return (
-		<div style={{ display: 'flex' }}>
-			<button className='up-button' onClick={onMoveUp}>
-				↑
-			</button>
-			<button className='down-button' onClick={onMoveDown}>
-				↓
-			</button>
+		<div style={{ display: 'flex', gap: 10, margin: '10px 5px' }}>
+			<div style={{ display: 'flex', flexDirection: 'column' }}>
+				<button className='up-button' onClick={onMoveUp}>
+					↑
+				</button>
+				<button className='down-button' onClick={onMoveDown}>
+					↓
+				</button>
+			</div>
 			<span>{name}</span>
 			<label htmlFor={(keyName as string) + 'Asc'}>По возрастанию</label>
 			<input
+				id={(keyName as string) + 'Asc'}
 				type='radio'
 				value='asc'
 				name={(keyName as string) + 'Asc'}
@@ -42,6 +45,7 @@ const Sorter = <Type, Key extends keyof Type>({
 			/>
 			<label htmlFor={(keyName as string) + 'Desc'}>По убыванию</label>
 			<input
+				id={(keyName as string) + 'Desc'}
 				type='radio'
 				value='desc'
 				name={(keyName as string) + 'Desc'}
@@ -50,6 +54,7 @@ const Sorter = <Type, Key extends keyof Type>({
 			/>
 			<label htmlFor={(keyName as string) + 'Ns'}>Не сортировать</label>
 			<input
+				id={(keyName as string) + 'Ns'}
 				type='radio'
 				value='ns'
 				name={(keyName as string) + 'Ns'}

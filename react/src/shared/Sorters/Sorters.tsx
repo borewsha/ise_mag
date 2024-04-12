@@ -44,9 +44,9 @@ const Sorters = <Type, Key extends keyof Type>({
 		<div>
 			{sorters.map(({ key, name, sorting }, index) => (
 				<Sorter
+					key={key as string}
 					onMoveDown={() => moveItem(index, 'down')}
 					onMoveUp={() => moveItem(index, 'up')}
-					key={key as string}
 					keyName={key}
 					name={name}
 					sorting={sorting}
