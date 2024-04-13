@@ -4,6 +4,7 @@ import { DataCustomNameByField } from '@/types/DataCustomNameByField'
 import PaginationTable from '@/shared/PaginationTable/PaginationTable'
 import Filters from '@/shared/Filters/Filters'
 import Sorters, { ISorters } from '@/shared/Sorters/Sorters'
+import Chart from '@/shared/Chart/Chart'
 
 export type FilterObject<Type> = {
 	[key in keyof Type]?: string[]
@@ -160,6 +161,7 @@ const VideoGamesTable = () => {
 					Показать
 				</button>
 			</div>
+			<Chart data={displayedData} />
 			<PaginationTable
 				data={displayedData}
 				columns={columns}

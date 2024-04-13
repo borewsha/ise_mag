@@ -383,41 +383,33 @@
     const groups = d3.rollup(points, v => Object.assign(v, {z: v[0][2]}), d => d[2])
 
     // отрисованные линии
-    const line = d3.line()
-    let path
-    if (d3.select('#chart g.lines').empty()) {
-      path = svg.append("g")
-      .attr("class", "lines")
-      .attr("fill", "none")
-      .attr("stroke", "steelblue")
-      .attr("stroke-width", 1.5)
-      .attr("stroke-linejoin", "round")
-      .attr("stroke-linecap", "round")
-      .selectAll("path")
-      .data(groups.values())
-      .join("path")
-      .style("mix-blend-mode", "multiply")
-      .attr("d", line)
-    } else {
-      path = d3.select('#chart g.lines')
-      .selectAll("path")
-      .data(groups.values())
-      .join(
-          enter => enter.append("path")
-          .attr("class", "line")
-          .attr("fill", "none")
-          .attr("stroke", "steelblue")
-          .attr("stroke-width", 1.5)
-          .attr("stroke-linejoin", "round")
-          .attr("stroke-linecap", "round")
-          .style("mix-blend-mode", "multiply")
-          .attr("d", line)
-          .call(enter => enter.transition().duration(animationDuration).attr("d", line)),
-          update => update.call(
-              update => update.transition().duration(animationDuration).attr("d", line)),
-          exit => exit.transition().duration(animationDuration).remove()
-      )
-    }
+    const line = d3.line();
+    const linesGroup = svg.selectAll('g.lines')
+    .data([null]) // Привязка одного пустого элемента для создания или обновления группы линий
+    .join('g')
+    .attr('class', 'lines');
+
+    const path = linesGroup.selectAll('path')
+    .data(groups.values())
+    .join(
+      enter => enter.append('path')
+      .attr('class', 'line')
+      .attr('fill', 'none')
+      .attr('stroke', 'steelblue')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-linejoin', 'round')
+      .attr('stroke-linecap', 'round')
+      .style('mix-blend-mode', 'multiply')
+      .attr('d', line),
+      update => update
+      .transition()
+      .duration(animationDuration)
+      .attr('d', line),
+      exit => exit
+      .transition()
+      .duration(animationDuration)
+      .remove()
+    );
 
     const dot = svg.append("g")
     .attr("display", "none")
