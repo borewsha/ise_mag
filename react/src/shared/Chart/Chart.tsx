@@ -3,9 +3,11 @@ import * as d3 from 'd3'
 
 interface ChartProps {
 	data: any[]
+	showOnChart: string
+	aggregator: string
 }
 
-const Chart = ({ data }: ChartProps) => {
+const Chart = ({ data, showOnChart, aggregator }: ChartProps) => {
 	const d3Container = useRef<SVGSVGElement>(null)
 
 	const width = 1500
@@ -23,10 +25,13 @@ const Chart = ({ data }: ChartProps) => {
 			const groupX = d3.group(data, d => d.year)
 			const axesXData = groupX.keys()
 			for (const axesXItem of axesXData) {
-				const groupY = d3.group(groupX.get(axesXItem), d => d.genre)
+				const groupY = d3.group(groupX.get(axesXItem), d => d[showOnChart])
 				const axesYData = groupY.keys()
 				for (const axesYItem of axesYData) {
-					const viewData = d3.sum(groupY.get(axesYItem), d => d.globalSales)
+					const viewData = d3[aggregator](
+						groupY.get(axesYItem),
+						d => d.globalSales
+					)
 					resData.push({ axesXItem, axesYItem, viewData })
 				}
 			}

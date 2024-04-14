@@ -5,6 +5,7 @@ import PaginationTable from '@/shared/PaginationTable/PaginationTable'
 import Filters from '@/shared/Filters/Filters'
 import Sorters, { ISorters } from '@/shared/Sorters/Sorters'
 import Chart from '@/shared/Chart/Chart'
+import ChartSelectors from '@/shared/Chart/ChartSelectors'
 
 export type FilterObject<Type> = {
 	[key in keyof Type]?: string[]
@@ -31,6 +32,8 @@ const VideoGamesTable = () => {
 			sorting: 'ns'
 		}
 	])
+	const [showOnChart, setShowOnChart] = useState<string>('genre')
+	const [aggregator, setAggregator] = useState<string>('sum')
 
 	useEffect(() => {
 		d3.csv('vgsales.csv', res => {
@@ -133,6 +136,14 @@ const VideoGamesTable = () => {
 					setSelectedFilters={setSelectedFilters}
 				/>
 				<Sorters sorters={sorters} setSorters={setSorters} />
+				<ChartSelectors
+					onClickShowOnChart={e => {
+						setShowOnChart(e.target.value)
+					}}
+					onClickAggregation={e => {
+						setAggregator(e.target.value)
+					}}
+				/>
 				<button
 					style={{ height: '50px', width: '100px' }}
 					onClick={() => {
@@ -161,7 +172,11 @@ const VideoGamesTable = () => {
 					Показать
 				</button>
 			</div>
-			<Chart data={displayedData} />
+			<Chart
+				data={displayedData}
+				showOnChart={showOnChart}
+				aggregator={aggregator}
+			/>
 			<PaginationTable
 				data={displayedData}
 				columns={columns}
